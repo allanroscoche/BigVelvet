@@ -34,6 +34,8 @@ Copyright 2007, 2008 Daniel Zerbino (zerbino@ebi.ac.uk)
 #include "autoOpen.h"
 #include "kseq.h"
 
+#include "solid.h"
+
 #if !defined(BUNDLEDZLIB)
 #include <zlib.h>
 #elif defined(_WIN32) || defined(__WIN32__) || defined(WIN32)
@@ -370,34 +372,7 @@ static void writeSeqName(char*seq_name, SequencesWriter *seqWriteInfo, Category 
 	}
 }
 
-static void convertSequence(char*seq, SequencesWriter *seqWriteInfo)
-{
-  int i;
-  int size = strlen(seq);
 
-  for(i=2;i<size;i++) {
-    switch(seq[i]){
-    case '0':
-      seq[i-2] = 'A';
-      break;
-    case '1':
-      seq[i-2] = 'C';
-      break;
-    case '2':
-      seq[i-2] = 'G';
-      break;
-    case '3':
-      seq[i-2] = 'T';
-      break;
-    case '.':
-      seq[i-2] = 'N';
-      break;
-    }
-  }
-  seq[i-1] = seq[i-2] = 0;
-
-
-}
 
 static void writeSequence(char*seq, SequencesWriter *seqWriteInfo)
 {
@@ -758,7 +733,7 @@ static void readFastXPair(int fileType, SequencesWriter *seqWriteInfo, char *fil
 	velvetLog("Done\n");
 }
 
-static void readFastXCSFasta(int fileType, SequencesWriter *seqWriteInfo, char *filename1, char *qualfilename1, char *filename2, char *qualfilename2, Category cat, IDnum * sequenceIndex)
+static void readFastXCSFasta(int fileType, SequencesWriter *seqWriteInfo, char *filename1, char *qualfilename1, char *filename2, char *qualfilename2, Category cat, IDnum * sequenceIndex, int min_qual)
 {
 	kseq_t *seq1, *seq2;
 	FileGZOrAuto file1, file2, file3, file4;
@@ -792,9 +767,10 @@ static void readFastXCSFasta(int fileType, SequencesWriter *seqWriteInfo, char *
 	seq1 = kseq_init(file1);
 	seq2 = kseq_init(file2);
 	while (kseq_read(seq1) >= 0) {
+      if(testRead(qualfilename1,min_qual) && testRead(qualfilename2,min_qual)){
 		counter++;
 		writeSeqName(seq1->name.s, seqWriteInfo, cat, sequenceIndex);
-        convertSequence(seq1->seq.s, seqWriteInfo);
+        convertSequence(seq1->seq.s);
 		writeSequence(seq1->seq.s, seqWriteInfo);
 
 		if (kseq_read(seq2) < 0)
@@ -802,8 +778,9 @@ static void readFastXCSFasta(int fileType, SequencesWriter *seqWriteInfo, char *
 
 		counter++;
 		writeSeqName(seq2->name.s, seqWriteInfo, cat, sequenceIndex);
-        convertSequence(seq2->seq.s, seqWriteInfo);
+        convertSequence(seq2->seq.s);
 		writeSequence(seq2->seq.s, seqWriteInfo);
+        }
 	}
 	if (kseq_read(seq2) >= 0)
 		  exitErrorf(EXIT_FAILURE, false, "Right sequence file '%s' has too many sequences", filename2);
@@ -1282,6 +1259,7 @@ void parseDataAndReadFiles(char * filename, int argc, char **argv, boolean * dou
 {
 	int argIndex = 1;
 	int filetype = FASTA;
+    int minQual = 0;
 	Category cat = 0;
 	IDnum sequenceIndex = 1;
 	short short_var;
@@ -1433,8 +1411,10 @@ void parseDataAndReadFiles(char * filename, int argc, char **argv, boolean * dou
 			break;
 
         case CSFASTA:
-          readFastXCSFasta(filetype, seqWriteInfo, argv[argIndex], argv[argIndex+1], argv[argIndex+2],argv[argIndex+3],cat, &sequenceIndex);
-          argIndex+=3;
+          minQual = atoi(argv[argIndex]);
+          velvetLog("Min quality: %d\n",minQual);
+          argIndex+=4;
+          readFastXCSFasta(filetype, seqWriteInfo, argv[argIndex-1], argv[argIndex-2], argv[argIndex-3],argv[argIndex-4],cat, &sequenceIndex, minQual);
           break;
 		case RAW:
 			if (separate_pair_files && cat%2==1) {
