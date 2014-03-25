@@ -370,6 +370,35 @@ static void writeSeqName(char*seq_name, SequencesWriter *seqWriteInfo, Category 
 	}
 }
 
+static void convertSequence(char*seq, SequencesWriter *seqWriteInfo)
+{
+  int i;
+  int size = strlen(seq);
+
+  for(i=2;i<size;i++) {
+    switch(seq[i]){
+    case '0':
+      seq[i-2] = 'A';
+      break;
+    case '1':
+      seq[i-2] = 'C';
+      break;
+    case '2':
+      seq[i-2] = 'G';
+      break;
+    case '3':
+      seq[i-2] = 'T';
+      break;
+    case '.':
+      seq[i-2] = 'N';
+      break;
+    }
+  }
+  seq[i-1] = seq[i-2] = 0;
+
+
+}
+
 static void writeSequence(char*seq, SequencesWriter *seqWriteInfo)
 {
 	char str[100];
@@ -546,6 +575,7 @@ static void fillReferenceCoordinateTable(char *filename, ReferenceCoordinateTabl
 #define FASTA 2
 #define FASTA_GZ 5
 #define FASTQ_GZ 6
+#define CSFASTA 7
 #define SAM 8
 #define BAM 9
 #define RAW 10
@@ -573,6 +603,10 @@ static gzFile openFastXFile(int fileType, char*filename)
 	  if (c != EOF && c!='>')
 	    exitErrorf(EXIT_FAILURE, false, "%s does not seem to be in FastA format", filename);
 	  break;
+    case CSFASTA:
+	  if (c != EOF && c!='#')
+	    exitErrorf(EXIT_FAILURE, false, "%s does not seem to be in CSFastA format", filename);
+      break;
 	case FASTQ:
 	case FASTQ_GZ:
 	  if (c != EOF && c!='@')
@@ -707,6 +741,68 @@ static void readFastXPair(int fileType, SequencesWriter *seqWriteInfo, char *fil
 
 		counter++;
 		writeSeqName(seq2->name.s, seqWriteInfo, cat, sequenceIndex);
+		writeSequence(seq2->seq.s, seqWriteInfo);
+	}
+	if (kseq_read(seq2) >= 0)
+		  exitErrorf(EXIT_FAILURE, false, "Right sequence file '%s' has too many sequences", filename2);
+
+	kseq_destroy(seq1);
+	kseq_destroy(seq2);
+
+        fileGZOrAuto_close(file1);
+        fileGZOrAuto_close(file2);
+
+	cleanupFastX(seqWriteInfo, cat);
+
+	velvetLog("%li sequences found in total in the paired sequence files\n", (long) counter);
+	velvetLog("Done\n");
+}
+
+static void readFastXCSFasta(int fileType, SequencesWriter *seqWriteInfo, char *filename1, char *qualfilename1, char *filename2, char *qualfilename2, Category cat, IDnum * sequenceIndex)
+{
+	kseq_t *seq1, *seq2;
+	FileGZOrAuto file1, file2, file3, file4;
+	IDnum counter = 0;
+
+    //exitErrorf(EXIT_FAILURE, false, "Arquivos: '%s', %s", filename1, filename2, filename3, filename4);
+
+	if (cat==REFERENCE)
+		exitErrorf(EXIT_FAILURE, false, "Cannot read reference sequence in 'separate' read mode");
+
+    file1.gzFile = file1.autoFile = NULL;
+    file2.gzFile = file2.autoFile = NULL;
+
+    if (fileType == AUTO) {
+      file1.autoFile = openFileAuto(filename1);
+      if (!file1.autoFile)
+        exitErrorf(EXIT_FAILURE, false, "Unable to open file '%s' in auto mode", filename1);
+      velvetLog("Reading file '%s' using '%s' as %s\n", filename1, file1.autoFile->decompressor, charToType(file1.autoFile->first_char));
+      file2.autoFile = openFileAuto(filename2);
+      if (!file2.autoFile)
+        exitErrorf(EXIT_FAILURE, false, "Unable to open file '%s' in auto mode", filename2);
+      velvetLog("Reading file '%s' using '%s' as %s\n", filename2, file2.autoFile->decompressor, charToType(file2.autoFile->first_char));
+    } else {
+      file1.gzFile = openFastXFile(fileType, filename1);
+      file2.gzFile = openFastXFile(fileType, filename2);
+    }
+
+	initFastX(seqWriteInfo, cat);
+
+	// Read a sequence at a time
+	seq1 = kseq_init(file1);
+	seq2 = kseq_init(file2);
+	while (kseq_read(seq1) >= 0) {
+		counter++;
+		writeSeqName(seq1->name.s, seqWriteInfo, cat, sequenceIndex);
+        convertSequence(seq1->seq.s, seqWriteInfo);
+		writeSequence(seq1->seq.s, seqWriteInfo);
+
+		if (kseq_read(seq2) < 0)
+		  exitErrorf(EXIT_FAILURE, false, "Right sequence file '%s' has too few sequences", filename2);
+
+		counter++;
+		writeSeqName(seq2->name.s, seqWriteInfo, cat, sequenceIndex);
+        convertSequence(seq2->seq.s, seqWriteInfo);
 		writeSequence(seq2->seq.s, seqWriteInfo);
 	}
 	if (kseq_read(seq2) >= 0)
@@ -1233,7 +1329,10 @@ void parseDataAndReadFiles(char * filename, int argc, char **argv, boolean * dou
 			if (strcmp(argv[argIndex], "-fastq") == 0)
 				filetype = FASTQ;
 			else if (strcmp(argv[argIndex], "-fasta") == 0)
-				filetype = FASTA;
+                filetype = FASTA;
+            else if (strcmp(argv[argIndex], "-csfasta") == 0) {
+                filetype = CSFASTA;
+            }
 			else if (strcmp(argv[argIndex], "-fastq.gz") == 0)
 				filetype = FASTQ_GZ;
 			else if (strcmp(argv[argIndex], "-fasta.gz") == 0)
@@ -1332,6 +1431,11 @@ void parseDataAndReadFiles(char * filename, int argc, char **argv, boolean * dou
 				readFastXFile(filetype, seqWriteInfo, argv[argIndex], cat, &sequenceIndex, refCoords);
 			}
 			break;
+
+        case CSFASTA:
+          readFastXCSFasta(filetype, seqWriteInfo, argv[argIndex], argv[argIndex+1], argv[argIndex+2],argv[argIndex+3],cat, &sequenceIndex);
+          argIndex+=3;
+          break;
 		case RAW:
 			if (separate_pair_files && cat%2==1) {
                         	exitErrorf(EXIT_FAILURE, false, "Currently do not support -separate mode for RAW");

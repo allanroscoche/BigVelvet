@@ -291,6 +291,7 @@ int main(int argc, char **argv)
 		if (isCreateBinary()) {
 			allSequences = importCnyReadSet(seqFilename);
 		} else {
+          velvetLog("import readset.\n");
 			allSequences = importReadSet(seqFilename);
 		}
 		velvetLog("%li sequences in total.\n", (long) allSequences->readCount);
