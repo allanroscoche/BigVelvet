@@ -735,6 +735,7 @@ static void readFastXPair(int fileType, SequencesWriter *seqWriteInfo, char *fil
 
 static void readFastXCSFasta(int fileType, SequencesWriter *seqWriteInfo, char *filename1, char *qualfilename1, char *filename2, char *qualfilename2, Category cat, IDnum * sequenceIndex, int min_qual)
 {
+  int tested=0;
 	kseq_t *seq1, *seq2;
 	FileGZOrAuto file1, file2, file3, file4;
 	IDnum counter = 0;
@@ -762,26 +763,30 @@ static void readFastXCSFasta(int fileType, SequencesWriter *seqWriteInfo, char *
     }
 
 	initFastX(seqWriteInfo, cat);
+    openQualFiles(qualfilename1,qualfilename2,min_qual);
 
 	// Read a sequence at a time
 	seq1 = kseq_init(file1);
 	seq2 = kseq_init(file2);
 	while (kseq_read(seq1) >= 0) {
-      if(testRead(qualfilename1,min_qual) && testRead(qualfilename2,min_qual)){
+      tested = testRead();
+      if(tested){
 		counter++;
 		writeSeqName(seq1->name.s, seqWriteInfo, cat, sequenceIndex);
         convertSequence(seq1->seq.s);
 		writeSequence(seq1->seq.s, seqWriteInfo);
-
-		if (kseq_read(seq2) < 0)
-		  exitErrorf(EXIT_FAILURE, false, "Right sequence file '%s' has too few sequences", filename2);
-
+      }
+      if (kseq_read(seq2) < 0)
+        exitErrorf(EXIT_FAILURE, false, "Right sequence file '%s' has too few sequences", filename2);
+      if(tested){
 		counter++;
 		writeSeqName(seq2->name.s, seqWriteInfo, cat, sequenceIndex);
         convertSequence(seq2->seq.s);
 		writeSequence(seq2->seq.s, seqWriteInfo);
         }
 	}
+    closeQualFiles();
+
 	if (kseq_read(seq2) >= 0)
 		  exitErrorf(EXIT_FAILURE, false, "Right sequence file '%s' has too many sequences", filename2);
 

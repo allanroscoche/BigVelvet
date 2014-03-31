@@ -2,7 +2,8 @@
 #define _SOLID_H_
 
 void convertSequence(char * seq);
-int testRead(char file, int minQual);
-
+int testRead();
+void openQualFiles(char *,char*,int);
+void closeQualFiles();
 
 #endif
