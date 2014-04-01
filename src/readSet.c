@@ -579,7 +579,7 @@ static gzFile openFastXFile(int fileType, char*filename)
 	    exitErrorf(EXIT_FAILURE, false, "%s does not seem to be in FastA format", filename);
 	  break;
     case CSFASTA:
-	  if (c != EOF && c!='#')
+	  if (c != EOF && c!='>')
 	    exitErrorf(EXIT_FAILURE, false, "%s does not seem to be in CSFastA format", filename);
       break;
 	case FASTQ:
@@ -768,8 +768,10 @@ static void readFastXCSFasta(int fileType, SequencesWriter *seqWriteInfo, char *
 	// Read a sequence at a time
 	seq1 = kseq_init(file1);
 	seq2 = kseq_init(file2);
+
 	while (kseq_read(seq1) >= 0) {
       tested = testRead();
+      //tested = 1;
       if(tested){
 		counter++;
 		writeSeqName(seq1->name.s, seqWriteInfo, cat, sequenceIndex);
@@ -783,7 +785,7 @@ static void readFastXCSFasta(int fileType, SequencesWriter *seqWriteInfo, char *
 		writeSeqName(seq2->name.s, seqWriteInfo, cat, sequenceIndex);
         convertSequence(seq2->seq.s);
 		writeSequence(seq2->seq.s, seqWriteInfo);
-        }
+      }
 	}
     closeQualFiles();
 
@@ -1419,7 +1421,7 @@ void parseDataAndReadFiles(char * filename, int argc, char **argv, boolean * dou
           minQual = atoi(argv[argIndex]);
           velvetLog("Min quality: %d\n",minQual);
           argIndex+=4;
-          readFastXCSFasta(filetype, seqWriteInfo, argv[argIndex-1], argv[argIndex-2], argv[argIndex-3],argv[argIndex-4],cat, &sequenceIndex, minQual);
+          readFastXCSFasta(filetype, seqWriteInfo, argv[argIndex], argv[argIndex-1], argv[argIndex-2],argv[argIndex-3],cat, &sequenceIndex, minQual);
           break;
 		case RAW:
 			if (separate_pair_files && cat%2==1) {
