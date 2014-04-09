@@ -763,7 +763,10 @@ static void readFastXCSFasta(int fileType, SequencesWriter *seqWriteInfo, char *
     }
 
 	initFastX(seqWriteInfo, cat);
-    openQualFiles(qualfilename1,qualfilename2,min_qual);
+
+    initFiles(filename1,qualfilename1,filename2,qualfilename2,min_qual);
+
+    //openQualFiles(qualfilename1,qualfilename2,min_qual);
 
 	// Read a sequence at a time
 	seq1 = kseq_init(file1);

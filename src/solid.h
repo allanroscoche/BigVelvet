@@ -4,6 +4,7 @@
 void convertSequence(char * seq);
 int testRead();
 void openQualFiles(char *,char*,int);
+void initFiles(char*, char*, char*, char*, int);
 void closeQualFiles();
 
 #endif

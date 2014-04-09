@@ -67,11 +67,12 @@ int testRead(){
   return 1;
 }
 
-void openQualFiles(char * file1, char * file2, int qual){
+//void openQualFiles(char * file1, char * file2, int qual){
+void initFiles(char *file1, char* qualfile1, char * file2, char * qualfile2, int qual){
   min_qual = qual;
 
-  q1 = fopen(file1, "r");
-  q2 = fopen(file2, "r");
+  q1 = fopen(qualfile1, "r");
+  q2 = fopen(qualfile2, "r");
 
   if(q1 == NULL)
     printf("Cannot open %s.\n",file1);
