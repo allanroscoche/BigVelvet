@@ -3,10 +3,19 @@
 #include "solid.h"
 
 #define READ_SIZE 50
+#define MKMER 12
+
+typedef struct Read{
+  unsigned int links;
+  short min_qual;
+} Read;
+
+Read * table;
+unsigned int * k_table;
 
 unsigned int errors_counter=0;
 int min_qual = 0;
-FILE * q1, * q2;
+FILE * q1, * q2, *r1, *r2;
 
 void convertSequence(char*seq)
 {
@@ -84,15 +93,32 @@ void initFiles(char *file1, char* qualfile1, char * file2, char * qualfile2, int
 
   q1 = fopen(qualfile1, "r");
   q2 = fopen(qualfile2, "r");
+  r1 = fopen(file1,"r");
+  r2 = fopen(file2,"r");
 
   if(q1 == NULL)
+    printf("Cannot open %s.\n",qualfile1);
+  else
+    velvetLog("Reading quality file '%s'\n", qualfile1);
+  if(q2 == NULL)
+    printf("cannot open %s.\n",qualfile2);
+  else
+    velvetLog("Reading quality file '%s'\n", qualfile2);
+
+  if(r1 == NULL)
     printf("Cannot open %s.\n",file1);
   else
     velvetLog("Reading quality file '%s'\n", file1);
-  if(q2 == NULL)
-    printf("cannot open %s.\n",file2);
+  if(r2 == NULL)
+    printf("Cannot open %s.\n",file2);
   else
     velvetLog("Reading quality file '%s'\n", file2);
+
+  size = countReads();
+  loadReads();
+  
+
+
 
 }
 
@@ -101,4 +127,51 @@ void closeQualFiles(){
 
   //fclose(q1);
   //fclose(q2);
+}
+
+void loadReads(){
+   
+  arquivo.clear();
+  arquivo_R3.clear();
+  arquivo.seekg(0, ios::beg);
+  arquivo_R3.seekg(0, ios::beg);
+  for(i=0;i<size;i++){
+    if((i % (size/10)) == 0 ){
+      cout << ".";
+      cout.flush();
+    }
+    if(i%2){
+      do{
+	getline(arquivo, linha);
+      }while(linha[0] != '>');
+      getline(arquivo, linha);
+    }
+    else {
+      do{
+	getline(arquivo_R3, linha);
+      }while(linha[0] != '>');
+      getline(arquivo_R3, linha);
+    }
+    reads[i].add(READ_TAM,linha);
+  }
+  arquivo.close();
+  arquivo_R3.close();
+}
+
+unsigned long countFileSize(){
+
+  string linha;
+  unsigned int l_size=0;
+
+  if(arquivo.is_open()){
+    while(arquivo.good()){
+      getline(arquivo, linha);
+      if(linha[0] == '>')
+        l_size++;
+    }
+  }
+  else {
+    cout << "Arquivo não pode ser aberto" << endl;
+  }
+  return l_size;
 }
