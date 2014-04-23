@@ -3,7 +3,8 @@
 #include "solid.h"
 
 #define READ_SIZE 50
-#define MKMER 12
+#define KMER_SIZE 8
+#define KTABLE_SIZE 1 << (KMER_SIZE*2)
 
 typedef struct Read{
   unsigned int links;
@@ -15,7 +16,11 @@ unsigned int * k_table;
 
 unsigned int errors_counter=0;
 int min_qual = 0;
+unsigned long size;
 FILE * q1, * q2, *r1, *r2;
+
+void generateAndInsertKmers(char * read);
+void tableInput(unsigned long key);
 
 void convertSequence(char*seq)
 {
@@ -44,6 +49,78 @@ void convertSequence(char*seq)
   seq[i-1] = seq[i-2] = 0;
 
 }
+
+unsigned long hash(char * kmer){
+
+  unsigned int i, code;
+  unsigned long result=0;
+
+  for(i=0;i<KMER_SIZE;i++){
+    switch(kmer[i]){
+    case 'A':
+      code =0;
+      break;
+    case 'C':
+      code=1;
+      break;
+    case 'G':
+      code=2;
+      break;
+    case 'T':
+      code=3;
+      break;
+    }
+    result |= code << i*2;
+  }
+  return result;
+}
+
+unsigned long countReads(){
+
+  char linha[200];
+  unsigned long l_size=0;
+
+  while(fscanf(r1, "%s",linha) != EOF)
+    if(linha[0] == '>')
+      l_size++;
+
+  return l_size;
+}
+
+
+void loadReads(){
+
+  unsigned int i;
+  char linha[200];
+  char read[200];
+
+  rewind(r1);
+
+  for(i=0;i<size;i++){
+    if((i % (size/10)) == 0 ){
+      fflush(r1);
+      printf(".");
+    }
+    if(i%2){
+      do{
+        fscanf(r1, "%s",linha);
+      }while(linha[0] != '>');
+      fscanf(r1, "%s",linha);
+    }
+    else {
+      do{
+        fscanf(r1, "%s",linha);
+      }while(linha[0] != '>');
+      fscanf(r1, "%s",linha);
+    }
+    strcpy(read,linha);
+    convertSequence(read);
+    generateAndInsertKmers(read);
+
+    //printf(":%s\n",read);
+  }
+}
+
 
 int testRead(){
 
@@ -83,7 +160,7 @@ int testRead(){
     printf("Error2 '%c': %s\n",line[0],line);
     exit(1);
   }
-  
+
   return 1;
 }
 
@@ -115,10 +192,9 @@ void initFiles(char *file1, char* qualfile1, char * file2, char * qualfile2, int
     velvetLog("Reading quality file '%s'\n", file2);
 
   size = countReads();
+  printf("Size:%lu\n",size);
+  initTable();
   loadReads();
-  
-
-
 
 }
 
@@ -129,49 +205,38 @@ void closeQualFiles(){
   //fclose(q2);
 }
 
-void loadReads(){
-   
-  arquivo.clear();
-  arquivo_R3.clear();
-  arquivo.seekg(0, ios::beg);
-  arquivo_R3.seekg(0, ios::beg);
-  for(i=0;i<size;i++){
-    if((i % (size/10)) == 0 ){
-      cout << ".";
-      cout.flush();
-    }
-    if(i%2){
-      do{
-	getline(arquivo, linha);
-      }while(linha[0] != '>');
-      getline(arquivo, linha);
-    }
-    else {
-      do{
-	getline(arquivo_R3, linha);
-      }while(linha[0] != '>');
-      getline(arquivo_R3, linha);
-    }
-    reads[i].add(READ_TAM,linha);
-  }
-  arquivo.close();
-  arquivo_R3.close();
+void initTable(){
+
+  unsigned long i;
+
+  printf("Init table with %u entries.\n",KTABLE_SIZE);
+
+  if(k_table == NULL)
+    k_table = (unsigned int * ) malloc ( sizeof(unsigned int * )*KTABLE_SIZE) ;
+
+  for(i=0;i<KTABLE_SIZE;i++)
+    k_table[i]=0;
+
 }
 
-unsigned long countFileSize(){
+void generateAndInsertKmers(char * read){
 
-  string linha;
-  unsigned int l_size=0;
+  int i,j;
+  char kmer[KMER_SIZE+1];
 
-  if(arquivo.is_open()){
-    while(arquivo.good()){
-      getline(arquivo, linha);
-      if(linha[0] == '>')
-        l_size++;
-    }
+  for(i=0;i<(READ_SIZE-KMER_SIZE);i++){
+    strncpy(kmer,&read[i],KMER_SIZE);
+    kmer[KMER_SIZE]=0;
+
+    // inserindo na hash
+    k_table[hash(kmer)]++;
+
+    /* Print Kmers
+    for(j=0;j<i;j++)
+      printf(" ");
+    //printf("%s",kmer);
+    printf("%d\n",hash(kmer));
+    // */
   }
-  else {
-    cout << "Arquivo não pode ser aberto" << endl;
-  }
-  return l_size;
 }
+
